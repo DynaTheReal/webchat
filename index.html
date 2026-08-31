@@ -69,13 +69,36 @@
     <h2>WebChat</h2>
 
     <!-- LOGIN & REGISTRIERUNG -->
-    <div id="auth-section">
-        <input type="email" id="email" placeholder="E-Mail-Adresse">
-        <input type="password" id="password" placeholder="Passwort (mind. 6 Zeichen)">
-        
-        <button id="btn-login">Einloggen</button>
-        <button id="btn-register" class="secondary-btn">Konto erstellen (Registrieren)</button>
-    </div>
+   // REGISTRIERUNG + E-MAIL VERIFIKATION SENDEN
+document.getElementById('btn-register').addEventListener('click', () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+        alert("Bitte E-Mail und Passwort eingeben!");
+        return;
+    }
+
+    createUserWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            
+            // Verifizierungs-E-Mail senden
+            sendEmailVerification(user)
+                .then(() => {
+                    alert("E-Mail wurde erfolgreich versendet! Bitte prüfe dein Postfach und den Spam-Ordner.");
+                    auth.signOut();
+                })
+                .catch((err) => {
+                    alert("Konto erstellt, aber E-Mail-Versand fehlgeschlagen: " + err.message);
+                });
+        })
+        .catch((error) => {
+            // Zeigt den genauen Firebase-Fehler an
+            alert("Fehler bei der Registrierung: " + error.code + "\n" + error.message);
+        });
+});
+
 
     <!-- CHAT BEREICH -->
     <div id="chat-section">
