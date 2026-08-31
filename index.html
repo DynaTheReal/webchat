@@ -3,146 +3,241 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mein GitHub Chat</title>
+    <title>Mein WebChat</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 500px; margin: 30px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
-        .hidden { display: none; }
-        #chat-box { height: 300px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; margin-bottom: 10px; border-radius: 4px; background: #f9f9f9; }
-        .message { margin-bottom: 8px; background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #eee; }
-        .sender { font-weight: bold; color: #007bff; }
-        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; }
-        button { background-color: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button:hover { background-color: #218838; }
-        #btn-register { background-color: #007bff; }
-        #btn-register:hover { background-color: #0056b3; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        h2 { text-align: center; color: #333; }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #0056b3; }
+        .secondary-btn {
+            background-color: #6c757d;
+        }
+        .secondary-btn:hover { background-color: #5a6268; }
+        #chat-section { display: none; }
+        #messages {
+            height: 300px;
+            border: 1px solid #ddd;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #fafafa;
+            border-radius: 5px;
+        }
+        .message { margin-bottom: 10px; }
+        .message .user { font-weight: bold; color: #007bff; }
+        .info-box {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
 
-    <!-- 1. ANMELDUNG / REGISTRIERUNG -->
-    <div id="auth-container">
-        <h2>Willkommen im Chat</h2>
-        <p>Bitte erstelle ein Konto oder logge dich ein:</p>
-        <input type="email" id="email" placeholder="E-Mail Adresse">
+<div class="chat-container">
+    <h2>WebChat</h2>
+
+    <!-- LOGIN & REGISTRIERUNG -->
+    <div id="auth-section">
+        <input type="email" id="email" placeholder="E-Mail-Adresse">
         <input type="password" id="password" placeholder="Passwort (mind. 6 Zeichen)">
+        
         <button id="btn-login">Einloggen</button>
-        <button id="btn-register">Registrieren</button>
-        <p id="auth-error" style="color: red; font-size: 14px;"></p>
+        <button id="btn-register" class="secondary-btn">Konto erstellen (Registrieren)</button>
     </div>
 
-    <!-- 2. CHAT FENSTER -->
-    <div id="chat-container" class="hidden">
-        <h2>Chatraum</h2>
-        <p>Eingeloggt als: <strong id="user-display"></strong> 
-           <button id="btn-logout" style="width: auto; background-color: #dc3545; padding: 5px 10px; margin-left: 10px;">Abmelden</button>
-        </p>
-        
-        <div id="chat-box"></div>
-
+    <!-- CHAT BEREICH -->
+    <div id="chat-section">
+        <div class="info-box">
+            Angemeldet als: <span id="user-display"></span>
+        </div>
+        <div id="messages"></div>
         <input type="text" id="message-input" placeholder="Nachricht schreiben...">
         <button id="btn-send">Senden</button>
+        <button id="btn-logout" class="secondary-btn" style="margin-top: 15px;">Abmelden</button>
     </div>
+</div>
 
-    <!-- Firebase Skripte einbinden -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { 
-            getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { 
-            getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+<!-- FIREBASE SDKS -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { 
+        getAuth, 
+        createUserWithEmailAndPassword, 
+        signInWithEmailAndPassword, 
+        sendEmailVerification, 
+        onAuthStateChanged, 
+        signOut 
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { 
+        getFirestore, 
+        collection, 
+        addDoc, 
+        query, 
+        orderBy, 
+        onSnapshot, 
+        serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // ⚠️ HIER DEINE EIGENE FIREBASE-KONFIGURATION EINSETZEN:
-        const firebaseConfig = {
-           apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
-  authDomain: "webchat-1c480.firebaseapp.com",
-  projectId: "webchat-1c480",
-  storageBucket: "webchat-1c480.firebasestorage.app",
-  messagingSenderId: "149320504905",
-  appId: "1:149320504905:web:501f24bdf3846d32b15198",
-  measurementId: "G-LN66CN39SJ"
-        };
+    // DEINE FIREBASE KONFIGURATION
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
+      authDomain: "webchat-1c480.firebaseapp.com",
+      projectId: "webchat-1c480",
+      storageBucket: "webchat-1c480.firebasestorage.app",
+      messagingSenderId: "149320504905",
+      appId: "1:149320504905:web:501f24bdf3846d32b15198",
+      measurementId: "G-LN66CN39SJ"
+    };
 
-        // Firebase starten
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+    // Firebase Initialisieren
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-        // HTML Elemente
-        const authContainer = document.getElementById('auth-container');
-        const chatContainer = document.getElementById('chat-container');
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const authError = document.getElementById('auth-error');
-        const userDisplay = document.getElementById('user-display');
-        const chatBox = document.getElementById('chat-box');
-        const messageInput = document.getElementById('message-input');
+    // HTML Elemente
+    const authSection = document.getElementById('auth-section');
+    const chatSection = document.getElementById('chat-section');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const userDisplay = document.getElementById('user-display');
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
 
-        // REGISTRIEREN
-        document.getElementById('btn-register').addEventListener('click', () => {
-            authError.textContent = "";
-            createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-                .catch(error => authError.textContent = error.message);
-        });
+    // REGISTRIERUNG + E-MAIL VERIFIKATION SENDEN
+    document.getElementById('btn-register').addEventListener('click', () => {
+        const email = emailInput.value;
+        const password = passwordInput.value;
 
-        // EINLOGGEN
-        document.getElementById('btn-login').addEventListener('click', () => {
-            authError.textContent = "";
-            signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-                .catch(error => authError.textContent = error.message);
-        });
+        if (!email || !password) {
+            alert("Bitte E-Mail und Passwort eingeben!");
+            return;
+        }
 
-        // AUSLOGGEN
-        document.getElementById('btn-logout').addEventListener('click', () => {
-            signOut(auth);
-        });
+        createUserWithEmailAndPassword(auth, email, password)
+            .then((userCredential) => {
+                const user = userCredential.user;
+                
+                // Verifizierungs-E-Mail senden
+                sendEmailVerification(user)
+                    .then(() => {
+                        alert("Registrierung erfolgreich! Wir haben dir eine Verifizierungs-E-Mail geschickt. Bitte klicke auf den Link in der E-Mail, bevor du dich einloggst.");
+                        auth.signOut(); // Sofort abmelden, bis bestätigt wurde
+                    })
+                    .catch((err) => {
+                        alert("Konto erstellt, aber E-Mail konnte nicht gesendet werden: " + err.message);
+                    });
+            })
+            .catch((error) => {
+                alert("Fehler bei der Registrierung: " + error.message);
+            });
+    });
 
-        // PRÜFEN, OB JEMAND EINGELOGGT IST
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                authContainer.classList.add('hidden');
-                chatContainer.classList.remove('hidden');
-                userDisplay.textContent = user.email;
-                loadMessages();
-            } else {
-                authContainer.classList.remove('hidden');
-                chatContainer.classList.add('hidden');
-            }
-        });
+    // LOGIN + PRÜFUNG AUF VERIFIZIERUNG
+    document.getElementById('btn-login').addEventListener('click', () => {
+        const email = emailInput.value;
+        const password = passwordInput.value;
 
-        // NACHRICHT SENDEN
-        document.getElementById('btn-send').addEventListener('click', async () => {
-            const text = messageInput.value.trim();
-            if (text !== '') {
+        signInWithEmailAndPassword(auth, email, password)
+            .then((userCredential) => {
+                const user = userCredential.user;
+
+                // PRÜFEN, OB DIE E-MAIL VERIFIZIERT IST
+                if (!user.emailVerified) {
+                    alert("Deine E-Mail-Adresse ist noch nicht verifiziert! Bitte prüfe dein Postfach (auch Spam-Ordner) und klicke auf den Bestätigungslink.");
+                    auth.signOut(); // Abmelden, falls nicht verifiziert
+                } else {
+                    alert("Erfolgreich eingeloggt!");
+                }
+            })
+            .catch((error) => {
+                alert("Login fehlgeschlagen: " + error.message);
+            });
+    });
+
+    // ABMELDEN
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        signOut(auth);
+    });
+
+    // AUTH-STATUS BEOBACHTEN
+    onAuthStateChanged(auth, (user) => {
+        if (user && user.emailVerified) {
+            // Nur wenn eingeloggt UND E-Mail verifiziert ist
+            authSection.style.display = "none";
+            chatSection.style.display = "block";
+            userDisplay.textContent = user.email;
+            loadMessages();
+        } else {
+            authSection.style.display = "block";
+            chatSection.style.display = "none";
+        }
+    });
+
+    // NACHRICHT SENDEN
+    document.getElementById('btn-send').addEventListener('click', async () => {
+        const text = messageInput.value.trim();
+        if (text !== "" && auth.currentUser) {
+            try {
                 await addDoc(collection(db, "messages"), {
                     text: text,
-                    sender: auth.currentUser.email,
-                    createdAt: serverTimestamp()
+                    user: auth.currentUser.email,
+                    timestamp: serverTimestamp()
                 });
-                messageInput.value = '';
+                messageInput.value = "";
+            } catch (e) {
+                alert("Fehler beim Senden: " + e.message);
             }
-        });
-
-        // NACHRICHTEN ECHTZEIT-SYNCHRONISATION
-        function loadMessages() {
-            const q = query(collection(db, "messages"), orderBy("createdAt", "asc"));
-            onSnapshot(q, (snapshot) => {
-                chatBox.innerHTML = '';
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.text) {
-                        const msgElement = document.createElement('div');
-                        msgElement.classList.add('message');
-                        // Zeigt nur den Namen vor dem @ der E-Mail an
-                        const username = data.sender ? data.sender.split('@')[0] : 'Unbekannt';
-                        msgElement.innerHTML = `<span class="sender">${username}:</span> ${data.text}`;
-                        chatBox.appendChild(msgElement);
-                    }
-                });
-                chatBox.scrollTop = chatBox.scrollHeight;
-            });
         }
-    </script>
+    });
+
+    // NACHRICHTEN ECHTZEIT-LADEN
+    function loadMessages() {
+        const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
+        onSnapshot(q, (snapshot) => {
+            messagesDiv.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const msgEl = document.createElement('div');
+                msgEl.className = 'message';
+                msgEl.innerHTML = `<span class="user">${data.user}:</span> ${data.text}`;
+                messagesDiv.appendChild(msgEl);
+            });
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+    }
+</script>
+
 </body>
 </html>
