@@ -68,37 +68,14 @@
 <div class="chat-container">
     <h2>WebChat</h2>
 
-    <!-- LOGIN & REGISTRIERUNG -->
-   // REGISTRIERUNG + E-MAIL VERIFIKATION SENDEN
-document.getElementById('btn-register').addEventListener('click', () => {
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
-
-    if (!email || !password) {
-        alert("Bitte E-Mail und Passwort eingeben!");
-        return;
-    }
-
-    createUserWithEmailAndPassword(auth, email, password)
-        .then((userCredential) => {
-            const user = userCredential.user;
-            
-            // Verifizierungs-E-Mail senden
-            sendEmailVerification(user)
-                .then(() => {
-                    alert("E-Mail wurde erfolgreich versendet! Bitte prüfe dein Postfach und den Spam-Ordner.");
-                    auth.signOut();
-                })
-                .catch((err) => {
-                    alert("Konto erstellt, aber E-Mail-Versand fehlgeschlagen: " + err.message);
-                });
-        })
-        .catch((error) => {
-            // Zeigt den genauen Firebase-Fehler an
-            alert("Fehler bei der Registrierung: " + error.code + "\n" + error.message);
-        });
-});
-
+    <!-- AUTHENTIFIZIERUNG -->
+    <div id="auth-section">
+        <input type="email" id="email" placeholder="E-Mail-Adresse">
+        <input type="password" id="password" placeholder="Passwort (mind. 6 Zeichen)">
+        
+        <button id="btn-login">Einloggen</button>
+        <button id="btn-register" class="secondary-btn">Konto erstellen (Registrieren)</button>
+    </div>
 
     <!-- CHAT BEREICH -->
     <div id="chat-section">
@@ -112,7 +89,7 @@ document.getElementById('btn-register').addEventListener('click', () => {
     </div>
 </div>
 
-<!-- FIREBASE SDKS -->
+<!-- FIREBASE SKRIPT -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { 
@@ -133,7 +110,7 @@ document.getElementById('btn-register').addEventListener('click', () => {
         serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // DEINE FIREBASE KONFIGURATION
+    // FIREBASE KONFIGURATION
     const firebaseConfig = {
       apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
       authDomain: "webchat-1c480.firebaseapp.com",
@@ -144,7 +121,7 @@ document.getElementById('btn-register').addEventListener('click', () => {
       measurementId: "G-LN66CN39SJ"
     };
 
-    // Firebase Initialisieren
+    // Firebase Initialisierung
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -158,9 +135,9 @@ document.getElementById('btn-register').addEventListener('click', () => {
     const messagesDiv = document.getElementById('messages');
     const messageInput = document.getElementById('message-input');
 
-    // REGISTRIERUNG + E-MAIL VERIFIKATION SENDEN
+    // REGISTRIERUNG
     document.getElementById('btn-register').addEventListener('click', () => {
-        const email = emailInput.value;
+        const email = emailInput.value.trim();
         const password = passwordInput.value;
 
         if (!email || !password) {
@@ -175,37 +152,36 @@ document.getElementById('btn-register').addEventListener('click', () => {
                 // Verifizierungs-E-Mail senden
                 sendEmailVerification(user)
                     .then(() => {
-                        alert("Registrierung erfolgreich! Wir haben dir eine Verifizierungs-E-Mail geschickt. Bitte klicke auf den Link in der E-Mail, bevor du dich einloggst.");
-                        auth.signOut(); // Sofort abmelden, bis bestätigt wurde
+                        alert("Registrierung erfolgreich! Eine Bestätigungs-E-Mail wurde gesendet. Bitte prüfe dein Postfach (auch den Spam-Ordner).");
+                        auth.signOut();
                     })
                     .catch((err) => {
                         alert("Konto erstellt, aber E-Mail konnte nicht gesendet werden: " + err.message);
                     });
             })
             .catch((error) => {
-                alert("Fehler bei der Registrierung: " + error.message);
+                alert("Fehler bei der Registrierung:\n" + error.code + "\n" + error.message);
             });
     });
 
-    // LOGIN + PRÜFUNG AUF VERIFIZIERUNG
+    // LOGIN
     document.getElementById('btn-login').addEventListener('click', () => {
-        const email = emailInput.value;
+        const email = emailInput.value.trim();
         const password = passwordInput.value;
 
         signInWithEmailAndPassword(auth, email, password)
             .then((userCredential) => {
                 const user = userCredential.user;
 
-                // PRÜFEN, OB DIE E-MAIL VERIFIZIERT IST
                 if (!user.emailVerified) {
-                    alert("Deine E-Mail-Adresse ist noch nicht verifiziert! Bitte prüfe dein Postfach (auch Spam-Ordner) und klicke auf den Bestätigungslink.");
-                    auth.signOut(); // Abmelden, falls nicht verifiziert
+                    alert("Deine E-Mail-Adresse ist noch nicht verifiziert! Bitte klicke erst auf den Link in deiner E-Mail.");
+                    auth.signOut();
                 } else {
                     alert("Erfolgreich eingeloggt!");
                 }
             })
             .catch((error) => {
-                alert("Login fehlgeschlagen: " + error.message);
+                alert("Login fehlgeschlagen:\n" + error.message);
             });
     });
 
@@ -214,10 +190,9 @@ document.getElementById('btn-register').addEventListener('click', () => {
         signOut(auth);
     });
 
-    // AUTH-STATUS BEOBACHTEN
+    // ZUSTAND PRÜFEN
     onAuthStateChanged(auth, (user) => {
         if (user && user.emailVerified) {
-            // Nur wenn eingeloggt UND E-Mail verifiziert ist
             authSection.style.display = "none";
             chatSection.style.display = "block";
             userDisplay.textContent = user.email;
@@ -245,7 +220,7 @@ document.getElementById('btn-register').addEventListener('click', () => {
         }
     });
 
-    // NACHRICHTEN ECHTZEIT-LADEN
+    // NACHRICHTEN LADEN
     function loadMessages() {
         const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
         onSnapshot(q, (snapshot) => {
