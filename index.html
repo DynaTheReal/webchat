@@ -292,7 +292,6 @@
         <h3>Verfügbare Lobbys</h3>
         <div id="lobby-list" class="lobby-list"></div>
 
-        <!-- Erstellen nur für Admin sichtbar -->
         <div id="admin-create-lobby" style="margin-top: 20px; border-top: 1px solid #444746; padding-top: 16px;">
             <h3>Neue Lobby erstellen (Admin)</h3>
             <div class="input-group">
@@ -343,9 +342,13 @@
         onSnapshot, 
         serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { 
+        getMessaging, 
+        getToken, 
+        onMessage 
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
-    // HIER DEINE UID FÜR DEN ADMIN-STATUS EINFÜGEN:
-    const ADMIN_UID = "839EC6PcMoMLwWly7nMzGPe91wk1"; 
+    const ADMIN_UID = "HIER_DEINE_FIREBASE_UID_EINFUEGEN"; 
 
     const firebaseConfig = {
       apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
@@ -360,13 +363,44 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const messaging = getMessaging(app);
 
     let isRegisterMode = false;
     let currentLobbyId = null;
     let unsubscribeMessages = null;
     let isAdmin = false;
+    let isInitialLoad = true;
 
-    // Helper für verifizierte Lobbys aus dem LocalStorage
+    // Service Worker registrieren & Benachrichtigungs-Rechte anfordern
+    async function requestNotificationPermission(user) {
+        if ('serviceWorker' in navigator && 'Notification' in window) {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    const token = await getToken(messaging, { serviceWorkerRegistration: registration });
+                    
+                    if (token) {
+                        // Speichere das Push-Token des Nutzers in Firestore
+                        await setDoc(doc(db, "users", user.uid), {
+                            pushToken: token,
+                            username: user.displayName || user.email
+                        }, { merge: true });
+                    }
+                }
+            } catch (error) {
+                console.log("Benachrichtigungs-Einrichtung abgebrochen/fehlgeschlagen:", error);
+            }
+        }
+    }
+
+    // Nachricht im Vordergrund empfangen (wenn Tab offen ist)
+    onMessage(messaging, (payload) => {
+        new Notification(payload.notification.title, {
+            body: payload.notification.body
+        });
+    });
+
     function getSavedLobbies() {
         return JSON.parse(localStorage.getItem("savedLobbies") || "{}");
     }
@@ -453,6 +487,9 @@
             } else {
                 adminCreateLobby.style.display = "none";
             }
+
+            // Benachrichtigungserlaubnis beim Login anfordern
+            requestNotificationPermission(user);
 
             const savedLobbyId = localStorage.getItem("autoSavedLobbyId");
             if (savedLobbyId) {
@@ -557,7 +594,6 @@
     function joinLobby(lobbyId, name, correctPassword) {
         const savedLobbies = getSavedLobbies();
 
-        // Falls das Passwort für diese Lobby schon einmal eingegeben wurde:
         if (savedLobbies[lobbyId] === correctPassword) {
             localStorage.setItem("autoSavedLobbyId", lobbyId);
             localStorage.setItem(`lastSeen_${lobbyId}`, Date.now());
@@ -565,7 +601,6 @@
             return;
         }
 
-        // Falls kein Passwort gespeichert ist, abfragen:
         const enteredPassword = prompt(`Passwort für Lobby "${name}" eingeben:`);
         if (enteredPassword === correctPassword) {
             saveLobbyAccess(lobbyId, correctPassword);
@@ -624,7 +659,9 @@
     }
 
     function loadMessages(lobbyId) {
+        isInitialLoad = true;
         const q = query(collection(db, "lobbies", lobbyId, "messages"), orderBy("timestamp", "asc"));
+        
         unsubscribeMessages = onSnapshot(q, (snapshot) => {
             messagesDiv.innerHTML = "";
             snapshot.forEach((docSnap) => {
@@ -638,7 +675,16 @@
                     <div class="text">${escapeHtml(data.text)}</div>
                 `;
                 messagesDiv.appendChild(msgEl);
+
+                // Lokale Browser-Mitteilung auslösen, wenn Seite im Hintergrund ist
+                if (!isInitialLoad && !isOwn && document.hidden && Notification.permission === "granted") {
+                    new Notification(`Neue Nachricht von ${data.user}`, {
+                        body: data.text
+                    });
+                }
             });
+
+            isInitialLoad = false;
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
     }
