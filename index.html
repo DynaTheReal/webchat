@@ -93,6 +93,17 @@
             background-color: #282a2c;
         }
 
+        .delete-btn {
+            background-color: #a50e0e;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+        }
+
+        .delete-btn:hover {
+            background-color: #b3261e;
+        }
+
         .toggle-text {
             text-align: center;
             margin-top: 14px;
@@ -129,7 +140,6 @@
             gap: 8px;
         }
 
-        /* Kleiner Fragezeichen-Button oben rechts */
         .help-btn {
             background: transparent;
             border: 1px solid #444746;
@@ -153,7 +163,6 @@
             border-color: #a8c7fa;
         }
 
-        /* LOBBY LISTE */
         .lobby-list {
             display: flex;
             flex-direction: column;
@@ -179,6 +188,11 @@
             gap: 10px;
         }
 
+        .lobby-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
         .badge {
             background-color: #ff4d4d;
             color: white;
@@ -193,7 +207,6 @@
             padding: 8px 16px;
         }
 
-        /* CHAT */
         #messages {
             height: 350px;
             overflow-y: auto;
@@ -242,7 +255,6 @@
             padding: 0 20px;
         }
 
-        /* Bereichs-Steuerung */
         #auth-section, #lobby-section, #chat-section, #admin-create-lobby {
             display: none;
         }
@@ -301,7 +313,7 @@
         <div id="messages"></div>
 
         <div class="chat-controls">
-            <input type="text" id="message-input" placeholder="Nachrichten schreiben...">
+            <input type="text" id="message-input" placeholder="Nachricht schreiben...">
             <button id="btn-send">Senden</button>
         </div>
     </div>
@@ -325,6 +337,7 @@
         doc,
         getDoc,
         setDoc,
+        deleteDoc,
         query, 
         orderBy, 
         onSnapshot, 
@@ -351,6 +364,18 @@
     let isRegisterMode = false;
     let currentLobbyId = null;
     let unsubscribeMessages = null;
+    let isAdmin = false;
+
+    // Helper für verifizierte Lobbys aus dem LocalStorage
+    function getSavedLobbies() {
+        return JSON.parse(localStorage.getItem("savedLobbies") || "{}");
+    }
+
+    function saveLobbyAccess(lobbyId, password) {
+        const saved = getSavedLobbies();
+        saved[lobbyId] = password;
+        localStorage.setItem("savedLobbies", JSON.stringify(saved));
+    }
 
     // DOM Elemente
     const authSection = document.getElementById('auth-section');
@@ -371,7 +396,6 @@
 
     usernameInput.style.display = "none";
 
-    // Modus Umschalten (Login / Registrieren)
     toggleAction.addEventListener('click', () => {
         isRegisterMode = !isRegisterMode;
         if (isRegisterMode) {
@@ -387,7 +411,6 @@
         }
     });
 
-    // Auth Button
     btnAuth.addEventListener('click', () => {
         const email = emailInput.value.trim();
         const password = passwordInput.value;
@@ -406,13 +429,11 @@
         }
     });
 
-    // Abmelden
     document.getElementById('btn-logout').addEventListener('click', () => {
         localStorage.removeItem("autoSavedLobbyId");
         signOut(auth);
     });
 
-    // Fragezeichen-Button
     document.getElementById('btn-show-uid').addEventListener('click', () => {
         if (auth.currentUser) {
             const uid = auth.currentUser.uid;
@@ -421,20 +442,18 @@
         }
     });
 
-    // Status Listener
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             authSection.style.display = "none";
             userDisplay.textContent = user.displayName || user.email;
 
-            // Prüfen ob angemeldeter Nutzer Admin ist via UID
-            if (user.uid === ADMIN_UID) {
+            isAdmin = (user.uid === ADMIN_UID);
+            if (isAdmin) {
                 adminCreateLobby.style.display = "block";
             } else {
                 adminCreateLobby.style.display = "none";
             }
 
-            // Automatische Wiederverbindung zur letzten Lobby prüfen
             const savedLobbyId = localStorage.getItem("autoSavedLobbyId");
             if (savedLobbyId) {
                 const lobbyDoc = await getDoc(doc(db, "lobbies", savedLobbyId));
@@ -456,7 +475,6 @@
         }
     });
 
-    // Automatisches Wiederverbinden ohne Passwort-Eingabe
     function autoReconnectToLobby(lobbyId, name) {
         currentLobbyId = lobbyId;
         currentLobbyDisplay.textContent = name;
@@ -467,7 +485,6 @@
         loadMessages(lobbyId);
     }
 
-    // Lobby Erstellen (Nur Admin)
     document.getElementById('btn-create-lobby').addEventListener('click', async () => {
         const name = document.getElementById('new-lobby-name').value.trim();
         const password = document.getElementById('new-lobby-password').value.trim();
@@ -488,7 +505,6 @@
         }
     });
 
-    // Lobbys Laden
     function loadLobbies() {
         onSnapshot(collection(db, "lobbies"), (snapshot) => {
             lobbyListDiv.innerHTML = "";
@@ -503,25 +519,56 @@
                 const lastMsg = lobby.lastMessageTime ? lobby.lastMessageTime.toMillis() : 0;
                 const hasUnread = lastMsg > lastSeen;
 
+                let deleteBtnHtml = isAdmin ? `<button class="delete-btn" data-id="${lobbyId}">Löschen</button>` : '';
+
                 card.innerHTML = `
                     <div class="lobby-info">
                         <strong>${escapeHtml(lobby.name)}</strong>
                         ${hasUnread ? '<span class="badge">Neu!</span>' : ''}
                     </div>
-                    <button class="join-btn">Beitreten</button>
+                    <div class="lobby-buttons">
+                        <button class="join-btn">Beitreten</button>
+                        ${deleteBtnHtml}
+                    </div>
                 `;
 
                 card.querySelector('.join-btn').addEventListener('click', () => joinLobby(lobbyId, lobby.name, lobby.password));
+
+                if (isAdmin) {
+                    card.querySelector('.delete-btn').addEventListener('click', () => deleteLobby(lobbyId, lobby.name));
+                }
+
                 lobbyListDiv.appendChild(card);
             });
         });
     }
 
-    // Lobby Beitreten
+    async function deleteLobby(lobbyId, name) {
+        if (confirm(`Möchtest du die Lobby "${name}" wirklich unwiderruflich löschen?`)) {
+            try {
+                await deleteDoc(doc(db, "lobbies", lobbyId));
+                alert("Lobby gelöscht.");
+            } catch (e) {
+                alert("Fehler beim Löschen: " + e.message);
+            }
+        }
+    }
+
     function joinLobby(lobbyId, name, correctPassword) {
+        const savedLobbies = getSavedLobbies();
+
+        // Falls das Passwort für diese Lobby schon einmal eingegeben wurde:
+        if (savedLobbies[lobbyId] === correctPassword) {
+            localStorage.setItem("autoSavedLobbyId", lobbyId);
+            localStorage.setItem(`lastSeen_${lobbyId}`, Date.now());
+            autoReconnectToLobby(lobbyId, name);
+            return;
+        }
+
+        // Falls kein Passwort gespeichert ist, abfragen:
         const enteredPassword = prompt(`Passwort für Lobby "${name}" eingeben:`);
         if (enteredPassword === correctPassword) {
-            // Speichert die Lobby-ID für Reconnects im Browser
+            saveLobbyAccess(lobbyId, correctPassword);
             localStorage.setItem("autoSavedLobbyId", lobbyId);
             localStorage.setItem(`lastSeen_${lobbyId}`, Date.now());
 
@@ -531,11 +578,9 @@
         }
     }
 
-    // Zurück zu Lobbys (Verlassen entfernt die Speicherung)
     document.getElementById('btn-leave-lobby').addEventListener('click', () => {
         if (unsubscribeMessages) unsubscribeMessages();
         
-        // Entfernt den automatischen Reconnect
         localStorage.removeItem("autoSavedLobbyId");
 
         if (currentLobbyId) {
@@ -548,7 +593,6 @@
         loadLobbies();
     });
 
-    // Nachricht Senden
     document.getElementById('btn-send').addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
@@ -579,7 +623,6 @@
         }
     }
 
-    // Nachrichten der Lobby laden
     function loadMessages(lobbyId) {
         const q = query(collection(db, "lobbies", lobbyId, "messages"), orderBy("timestamp", "asc"));
         unsubscribeMessages = onSnapshot(q, (snapshot) => {
