@@ -123,6 +123,36 @@
             font-weight: 500;
         }
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Kleiner Fragezeichen-Button oben rechts */
+        .help-btn {
+            background: transparent;
+            border: 1px solid #444746;
+            color: #8e918f;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.2s ease;
+        }
+
+        .help-btn:hover {
+            background-color: #333537;
+            color: #ffffff;
+            border-color: #a8c7fa;
+        }
+
         /* LOBBY LISTE */
         .lobby-list {
             display: flex;
@@ -241,7 +271,10 @@
     <div id="lobby-section">
         <div class="header-bar">
             <div>Angemeldet als: <span id="user-display"></span></div>
-            <button id="btn-logout" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Abmelden</button>
+            <div class="header-actions">
+                <button id="btn-show-uid" class="help-btn" title="Eigene UID anzeigen">?</button>
+                <button id="btn-logout" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Abmelden</button>
+            </div>
         </div>
 
         <h3>Verfügbare Lobbys</h3>
@@ -297,7 +330,7 @@
         serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // KOPERE DEINE FIREBASE-UID AUS DEM FIREBASE-DASHBOARD HIER HINEIN:
+    // KOPERE DEINE FIREBASE-UID NACH DEM KOPIEREN AUS DEM FRAGEZEICHEN-FENSTER HIER HINEIN:
     const ADMIN_UID = "HIER_DEINE_FIREBASE_UID_EINFUEGEN"; 
 
     const firebaseConfig = {
@@ -374,6 +407,15 @@
 
     // Abmelden
     document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+    // Fragezeichen-Button: UID in Popup anzeigen & in Zwischenablage kopieren
+    document.getElementById('btn-show-uid').addEventListener('click', () => {
+        if (auth.currentUser) {
+            const uid = auth.currentUser.uid;
+            navigator.clipboard.writeText(uid);
+            alert("Deine User-ID (UID):\n\n" + uid + "\n\n(Die UID wurde auch in deine Zwischenablage kopiert!)");
+        }
+    });
 
     // Status Listener
     onAuthStateChanged(auth, (user) => {
