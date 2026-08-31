@@ -1,0 +1,23 @@
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
+  authDomain: "webchat-1c480.firebaseapp.com",
+  projectId: "webchat-1c480",
+  storageBucket: "webchat-1c480.firebasestorage.app",
+  messagingSenderId: "149320504905",
+  appId: "1:149320504905:web:501f24bdf3846d32b15198"
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/icon.png' // Optionales Icon
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
