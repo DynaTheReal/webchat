@@ -295,13 +295,13 @@
     <div id="chat-section">
         <div class="header-bar">
             <div>Lobby: <span id="current-lobby-display"></span></div>
-            <button id="btn-leave-lobby" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Zurück zu Lobbys</button>
+            <button id="btn-leave-lobby" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Lobby verlassen</button>
         </div>
         
         <div id="messages"></div>
 
         <div class="chat-controls">
-            <input type="text" id="message-input" placeholder="Nachricht schreiben...">
+            <input type="text" id="message-input" placeholder="Nachrichten schreiben...">
             <button id="btn-send">Senden</button>
         </div>
     </div>
@@ -323,6 +323,7 @@
         collection, 
         addDoc, 
         doc,
+        getDoc,
         setDoc,
         query, 
         orderBy, 
@@ -330,8 +331,8 @@
         serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // KOPERE DEINE FIREBASE-UID NACH DEM KOPIEREN AUS DEM FRAGEZEICHEN-FENSTER HIER HINEIN:
-    const ADMIN_UID = "839EC6PcMoMLwWly7nMzGPe91wk1"; 
+    // HIER DEINE UID FÜR DEN ADMIN-STATUS EINFÜGEN:
+    const ADMIN_UID = "HIER_DEINE_FIREBASE_UID_EINFUEGEN"; 
 
     const firebaseConfig = {
       apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
@@ -406,9 +407,12 @@
     });
 
     // Abmelden
-    document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        localStorage.removeItem("autoSavedLobbyId");
+        signOut(auth);
+    });
 
-    // Fragezeichen-Button: UID in Popup anzeigen & in Zwischenablage kopieren
+    // Fragezeichen-Button
     document.getElementById('btn-show-uid').addEventListener('click', () => {
         if (auth.currentUser) {
             const uid = auth.currentUser.uid;
@@ -418,11 +422,9 @@
     });
 
     // Status Listener
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
             authSection.style.display = "none";
-            lobbySection.style.display = "block";
-            chatSection.style.display = "none";
             userDisplay.textContent = user.displayName || user.email;
 
             // Prüfen ob angemeldeter Nutzer Admin ist via UID
@@ -432,6 +434,20 @@
                 adminCreateLobby.style.display = "none";
             }
 
+            // Automatische Wiederverbindung zur letzten Lobby prüfen
+            const savedLobbyId = localStorage.getItem("autoSavedLobbyId");
+            if (savedLobbyId) {
+                const lobbyDoc = await getDoc(doc(db, "lobbies", savedLobbyId));
+                if (lobbyDoc.exists()) {
+                    autoReconnectToLobby(savedLobbyId, lobbyDoc.data().name);
+                    return;
+                } else {
+                    localStorage.removeItem("autoSavedLobbyId");
+                }
+            }
+
+            lobbySection.style.display = "block";
+            chatSection.style.display = "none";
             loadLobbies();
         } else {
             authSection.style.display = "block";
@@ -439,6 +455,17 @@
             chatSection.style.display = "none";
         }
     });
+
+    // Automatisches Wiederverbinden ohne Passwort-Eingabe
+    function autoReconnectToLobby(lobbyId, name) {
+        currentLobbyId = lobbyId;
+        currentLobbyDisplay.textContent = name;
+
+        lobbySection.style.display = "none";
+        chatSection.style.display = "block";
+
+        loadMessages(lobbyId);
+    }
 
     // Lobby Erstellen (Nur Admin)
     document.getElementById('btn-create-lobby').addEventListener('click', async () => {
@@ -461,7 +488,7 @@
         }
     });
 
-    // Lobbys Laden & Ungelesen-Status anzeigen
+    // Lobbys Laden
     function loadLobbies() {
         onSnapshot(collection(db, "lobbies"), (snapshot) => {
             lobbyListDiv.innerHTML = "";
@@ -472,7 +499,6 @@
                 const card = document.createElement('div');
                 card.className = 'lobby-card';
 
-                // Prüfen ob neue Nachrichten existieren
                 const lastSeen = localStorage.getItem(`lastSeen_${lobbyId}`) || 0;
                 const lastMsg = lobby.lastMessageTime ? lobby.lastMessageTime.toMillis() : 0;
                 const hasUnread = lastMsg > lastSeen;
@@ -495,27 +521,27 @@
     function joinLobby(lobbyId, name, correctPassword) {
         const enteredPassword = prompt(`Passwort für Lobby "${name}" eingeben:`);
         if (enteredPassword === correctPassword) {
-            currentLobbyId = lobbyId;
-            currentLobbyDisplay.textContent = name;
-            
-            // Verlassen-Zeitpunkt für Badges speichern
+            // Speichert die Lobby-ID für Reconnects im Browser
+            localStorage.setItem("autoSavedLobbyId", lobbyId);
             localStorage.setItem(`lastSeen_${lobbyId}`, Date.now());
 
-            lobbySection.style.display = "none";
-            chatSection.style.display = "block";
-
-            loadMessages(lobbyId);
+            autoReconnectToLobby(lobbyId, name);
         } else if (enteredPassword !== null) {
             alert("Falsches Passwort!");
         }
     }
 
-    // Zurück zu Lobbys
+    // Zurück zu Lobbys (Verlassen entfernt die Speicherung)
     document.getElementById('btn-leave-lobby').addEventListener('click', () => {
         if (unsubscribeMessages) unsubscribeMessages();
+        
+        // Entfernt den automatischen Reconnect
+        localStorage.removeItem("autoSavedLobbyId");
+
         if (currentLobbyId) {
             localStorage.setItem(`lastSeen_${currentLobbyId}`, Date.now());
         }
+        
         currentLobbyId = null;
         chatSection.style.display = "none";
         lobbySection.style.display = "block";
@@ -534,7 +560,6 @@
             try {
                 const now = serverTimestamp();
 
-                // Nachricht in Unterkollektion der Lobby speichern
                 await addDoc(collection(db, "lobbies", currentLobbyId, "messages"), {
                     text: text,
                     user: auth.currentUser.displayName || auth.currentUser.email,
@@ -542,7 +567,6 @@
                     timestamp: now
                 });
 
-                // Hauptlobby aktualisieren, damit die "Neu!" Anzeige getriggert wird
                 await setDoc(doc(db, "lobbies", currentLobbyId), {
                     lastMessageTime: now
                 }, { merge: true });
