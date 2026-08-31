@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebChat</title>
+    <title>WebChat mit Lobbys</title>
     <style>
         * {
             box-sizing: border-box;
@@ -32,13 +32,11 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         }
 
-        h2 {
+        h2, h3 {
             text-align: center;
             font-weight: 500;
-            font-size: 1.6rem;
-            margin-bottom: 20px;
             color: #f1f3f4;
-            letter-spacing: -0.5px;
+            margin-bottom: 16px;
         }
 
         .input-group {
@@ -89,7 +87,6 @@
             background-color: transparent;
             color: #a8c7fa;
             border: 1px solid #444746;
-            margin-top: 8px;
         }
 
         .secondary-btn:hover {
@@ -109,11 +106,7 @@
             text-decoration: underline;
         }
 
-        #chat-section {
-            display: none;
-        }
-
-        .user-bar {
+        .header-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -125,28 +118,60 @@
             color: #c4c7c5;
         }
 
-        .user-bar span {
+        .header-bar span {
             color: #a8c7fa;
             font-weight: 500;
         }
 
+        /* LOBBY LISTE */
+        .lobby-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .lobby-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #282a2c;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid #444746;
+        }
+
+        .lobby-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            background-color: #ff4d4d;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .lobby-card button {
+            width: auto;
+            padding: 8px 16px;
+        }
+
+        /* CHAT */
         #messages {
-            height: 380px;
+            height: 350px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 12px;
             padding-right: 6px;
             margin-bottom: 16px;
-        }
-
-        #messages::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        #messages::-webkit-scrollbar-thumb {
-            background: #444746;
-            border-radius: 4px;
         }
 
         .message {
@@ -173,11 +198,6 @@
             display: block;
         }
 
-        .message .text {
-            font-size: 0.95rem;
-            color: #e3e3e3;
-        }
-
         .chat-controls {
             display: flex;
             gap: 10px;
@@ -190,10 +210,10 @@
         .chat-controls button {
             width: auto;
             padding: 0 20px;
-            white-space: nowrap;
         }
 
-        #username-field {
+        /* Bereichs-Steuerung */
+        #auth-section, #lobby-section, #chat-section, #admin-create-lobby {
             display: none;
         }
     </style>
@@ -210,20 +230,39 @@
             <input type="email" id="email" placeholder="E-Mail-Adresse">
             <input type="password" id="password" placeholder="Passwort (mind. 6 Zeichen)">
         </div>
-
         <button id="btn-auth">Einloggen</button>
-
         <div class="toggle-text">
             <span id="toggle-prompt">Noch kein Konto?</span> 
             <span id="toggle-action" class="toggle-link">Jetzt registrieren</span>
         </div>
     </div>
 
+    <!-- LOBBY AUSWAHL -->
+    <div id="lobby-section">
+        <div class="header-bar">
+            <div>Angemeldet als: <span id="user-display"></span></div>
+            <button id="btn-logout" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Abmelden</button>
+        </div>
+
+        <h3>Verfügbare Lobbys</h3>
+        <div id="lobby-list" class="lobby-list"></div>
+
+        <!-- Erstellen nur für Admin sichtbar -->
+        <div id="admin-create-lobby" style="margin-top: 20px; border-top: 1px solid #444746; padding-top: 16px;">
+            <h3>Neue Lobby erstellen (Admin)</h3>
+            <div class="input-group">
+                <input type="text" id="new-lobby-name" placeholder="Lobby Name">
+                <input type="password" id="new-lobby-password" placeholder="Lobby Passwort">
+            </div>
+            <button id="btn-create-lobby">Lobby Erstellen</button>
+        </div>
+    </div>
+
     <!-- CHAT BEREICH -->
     <div id="chat-section">
-        <div class="user-bar">
-            <div>Eingeloggt als: <span id="user-display"></span></div>
-            <button id="btn-logout" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Abmelden</button>
+        <div class="header-bar">
+            <div>Lobby: <span id="current-lobby-display"></span></div>
+            <button id="btn-leave-lobby" class="secondary-btn" style="width: auto; padding: 4px 10px; margin: 0; font-size: 0.8rem;">Zurück zu Lobbys</button>
         </div>
         
         <div id="messages"></div>
@@ -250,13 +289,17 @@
         getFirestore, 
         collection, 
         addDoc, 
+        doc,
+        setDoc,
         query, 
         orderBy, 
         onSnapshot, 
         serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // FIREBASE KONFIGURATION
+    // KOPERE DEINE FIREBASE-UID AUS DEM FIREBASE-DASHBOARD HIER HINEIN:
+    const ADMIN_UID = "HIER_DEINE_FIREBASE_UID_EINFUEGEN"; 
+
     const firebaseConfig = {
       apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
       authDomain: "webchat-1c480.firebaseapp.com",
@@ -272,9 +315,12 @@
     const db = getFirestore(app);
 
     let isRegisterMode = false;
+    let currentLobbyId = null;
+    let unsubscribeMessages = null;
 
     // DOM Elemente
     const authSection = document.getElementById('auth-section');
+    const lobbySection = document.getElementById('lobby-section');
     const chatSection = document.getElementById('chat-section');
     const usernameInput = document.getElementById('username');
     const emailInput = document.getElementById('email');
@@ -283,13 +329,15 @@
     const togglePrompt = document.getElementById('toggle-prompt');
     const toggleAction = document.getElementById('toggle-action');
     const userDisplay = document.getElementById('user-display');
+    const adminCreateLobby = document.getElementById('admin-create-lobby');
+    const lobbyListDiv = document.getElementById('lobby-list');
+    const currentLobbyDisplay = document.getElementById('current-lobby-display');
     const messagesDiv = document.getElementById('messages');
     const messageInput = document.getElementById('message-input');
 
-    // Standardmäßig Benutzernamen-Feld ausblenden (nur beim Registrieren zeigen)
     usernameInput.style.display = "none";
 
-    // Modus umstellen (Login / Registrieren)
+    // Modus Umschalten (Login / Registrieren)
     toggleAction.addEventListener('click', () => {
         isRegisterMode = !isRegisterMode;
         if (isRegisterMode) {
@@ -305,63 +353,134 @@
         }
     });
 
-    // Login / Registrieren Button
+    // Auth Button
     btnAuth.addEventListener('click', () => {
         const email = emailInput.value.trim();
         const password = passwordInput.value;
         const username = usernameInput.value.trim();
 
-        if (!email || !password) {
-            alert("Bitte E-Mail und Passwort eingeben!");
-            return;
-        }
+        if (!email || !password) return alert("Bitte E-Mail und Passwort eingeben!");
 
         if (isRegisterMode) {
-            if (!username) {
-                alert("Bitte gib einen Benutzernamen ein!");
-                return;
-            }
-            // Registrieren
+            if (!username) return alert("Bitte Benutzernamen eingeben!");
             createUserWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    // Benutzernamen im Profil speichern
-                    updateProfile(userCredential.user, {
-                        displayName: username
-                    }).then(() => {
-                        alert("Konto erfolgreich erstellt!");
-                    });
-                })
-                .catch((error) => {
-                    alert("Registrierung fehlgeschlagen: " + error.message);
-                });
+                .then((res) => updateProfile(res.user, { displayName: username }))
+                .catch((err) => alert("Fehler: " + err.message));
         } else {
-            // Login
             signInWithEmailAndPassword(auth, email, password)
-                .catch((error) => {
-                    alert("Login fehlgeschlagen: " + error.message);
-                });
+                .catch((err) => alert("Login fehlgeschlagen: " + err.message));
         }
     });
 
     // Abmelden
-    document.getElementById('btn-logout').addEventListener('click', () => {
-        signOut(auth);
-    });
+    document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
-    // Login-Status prüfen
+    // Status Listener
     onAuthStateChanged(auth, (user) => {
         if (user) {
             authSection.style.display = "none";
-            chatSection.style.display = "block";
+            lobbySection.style.display = "block";
+            chatSection.style.display = "none";
             userDisplay.textContent = user.displayName || user.email;
-            loadMessages();
+
+            // Prüfen ob angemeldeter Nutzer Admin ist via UID
+            if (user.uid === ADMIN_UID) {
+                adminCreateLobby.style.display = "block";
+            } else {
+                adminCreateLobby.style.display = "none";
+            }
+
+            loadLobbies();
         } else {
             authSection.style.display = "block";
+            lobbySection.style.display = "none";
             chatSection.style.display = "none";
         }
     });
 
-    // Nachricht senden
+    // Lobby Erstellen (Nur Admin)
+    document.getElementById('btn-create-lobby').addEventListener('click', async () => {
+        const name = document.getElementById('new-lobby-name').value.trim();
+        const password = document.getElementById('new-lobby-password').value.trim();
+
+        if (!name || !password) return alert("Bitte Name und Passwort für die Lobby eingeben!");
+
+        try {
+            await addDoc(collection(db, "lobbies"), {
+                name: name,
+                password: password,
+                lastMessageTime: serverTimestamp()
+            });
+            document.getElementById('new-lobby-name').value = "";
+            document.getElementById('new-lobby-password').value = "";
+            alert("Lobby erfolgreich erstellt!");
+        } catch (e) {
+            alert("Fehler beim Erstellen: " + e.message);
+        }
+    });
+
+    // Lobbys Laden & Ungelesen-Status anzeigen
+    function loadLobbies() {
+        onSnapshot(collection(db, "lobbies"), (snapshot) => {
+            lobbyListDiv.innerHTML = "";
+            snapshot.forEach((docSnap) => {
+                const lobby = docSnap.data();
+                const lobbyId = docSnap.id;
+
+                const card = document.createElement('div');
+                card.className = 'lobby-card';
+
+                // Prüfen ob neue Nachrichten existieren
+                const lastSeen = localStorage.getItem(`lastSeen_${lobbyId}`) || 0;
+                const lastMsg = lobby.lastMessageTime ? lobby.lastMessageTime.toMillis() : 0;
+                const hasUnread = lastMsg > lastSeen;
+
+                card.innerHTML = `
+                    <div class="lobby-info">
+                        <strong>${escapeHtml(lobby.name)}</strong>
+                        ${hasUnread ? '<span class="badge">Neu!</span>' : ''}
+                    </div>
+                    <button class="join-btn">Beitreten</button>
+                `;
+
+                card.querySelector('.join-btn').addEventListener('click', () => joinLobby(lobbyId, lobby.name, lobby.password));
+                lobbyListDiv.appendChild(card);
+            });
+        });
+    }
+
+    // Lobby Beitreten
+    function joinLobby(lobbyId, name, correctPassword) {
+        const enteredPassword = prompt(`Passwort für Lobby "${name}" eingeben:`);
+        if (enteredPassword === correctPassword) {
+            currentLobbyId = lobbyId;
+            currentLobbyDisplay.textContent = name;
+            
+            // Verlassen-Zeitpunkt für Badges speichern
+            localStorage.setItem(`lastSeen_${lobbyId}`, Date.now());
+
+            lobbySection.style.display = "none";
+            chatSection.style.display = "block";
+
+            loadMessages(lobbyId);
+        } else if (enteredPassword !== null) {
+            alert("Falsches Passwort!");
+        }
+    }
+
+    // Zurück zu Lobbys
+    document.getElementById('btn-leave-lobby').addEventListener('click', () => {
+        if (unsubscribeMessages) unsubscribeMessages();
+        if (currentLobbyId) {
+            localStorage.setItem(`lastSeen_${currentLobbyId}`, Date.now());
+        }
+        currentLobbyId = null;
+        chatSection.style.display = "none";
+        lobbySection.style.display = "block";
+        loadLobbies();
+    });
+
+    // Nachricht Senden
     document.getElementById('btn-send').addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
@@ -369,35 +488,44 @@
 
     async function sendMessage() {
         const text = messageInput.value.trim();
-        if (text !== "" && auth.currentUser) {
+        if (text !== "" && auth.currentUser && currentLobbyId) {
             try {
-                await addDoc(collection(db, "messages"), {
+                const now = serverTimestamp();
+
+                // Nachricht in Unterkollektion der Lobby speichern
+                await addDoc(collection(db, "lobbies", currentLobbyId, "messages"), {
                     text: text,
                     user: auth.currentUser.displayName || auth.currentUser.email,
                     uid: auth.currentUser.uid,
-                    timestamp: serverTimestamp()
+                    timestamp: now
                 });
+
+                // Hauptlobby aktualisieren, damit die "Neu!" Anzeige getriggert wird
+                await setDoc(doc(db, "lobbies", currentLobbyId), {
+                    lastMessageTime: now
+                }, { merge: true });
+
                 messageInput.value = "";
+                localStorage.setItem(`lastSeen_${currentLobbyId}`, Date.now());
             } catch (e) {
                 alert("Fehler beim Senden: " + e.message);
             }
         }
     }
 
-    // Nachrichten laden & anzeigen
-    function loadMessages() {
-        const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-        onSnapshot(q, (snapshot) => {
+    // Nachrichten der Lobby laden
+    function loadMessages(lobbyId) {
+        const q = query(collection(db, "lobbies", lobbyId, "messages"), orderBy("timestamp", "asc"));
+        unsubscribeMessages = onSnapshot(q, (snapshot) => {
             messagesDiv.innerHTML = "";
-            snapshot.forEach((doc) => {
-                const data = doc.data();
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
                 const isOwn = auth.currentUser && data.uid === auth.currentUser.uid;
                 
                 const msgEl = document.createElement('div');
                 msgEl.className = `message ${isOwn ? 'own' : ''}`;
-                
                 msgEl.innerHTML = `
-                    <span class="username">${data.user}</span>
+                    <span class="username">${escapeHtml(data.user)}</span>
                     <div class="text">${escapeHtml(data.text)}</div>
                 `;
                 messagesDiv.appendChild(msgEl);
@@ -406,9 +534,8 @@
         });
     }
 
-    // HTML-Schutz gegen Code-Injektionen
     function escapeHtml(str) {
-        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
     }
 </script>
 
