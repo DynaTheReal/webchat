@@ -9,6 +9,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="WebChat">
     <style>
+        :root {
+            --glow-color: #0b57d0;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -27,6 +31,7 @@
         }
 
         .chat-container {
+            position: relative;
             width: 100%;
             max-width: 550px;
             background-color: #1e1f20;
@@ -34,6 +39,134 @@
             border-radius: 16px;
             padding: 24px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            transition: box-shadow 0.4s ease, border-color 0.4s ease;
+        }
+
+        /* Glow-Effekt für den Rand */
+        .chat-container.glow-active {
+            box-shadow: 0 0 25px 2px var(--glow-color), 0 0 50px -5px var(--glow-color);
+            border-color: var(--glow-color);
+        }
+
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .app-header h2 {
+            margin-bottom: 0;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: #c4c7c5;
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 50%;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            background-color: #282a2c;
+            color: #ffffff;
+        }
+
+        /* Einstellungen Modal / Popover */
+        .settings-modal {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 24px;
+            background-color: #282a2c;
+            border: 1px solid #444746;
+            border-radius: 12px;
+            padding: 16px;
+            width: 220px;
+            z-index: 100;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+        }
+
+        .settings-modal.open {
+            display: block;
+        }
+
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+
+        .settings-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .color-picker {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        .color-picker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch {
+            border: 2px solid #444746;
+            border-radius: 50%;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #444746;
+            transition: .3s;
+            border-radius: 22px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #0b57d0;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(18px);
         }
 
         h2, h3 {
@@ -50,7 +183,7 @@
             margin-bottom: 16px;
         }
 
-        input {
+        input[type="text"], input[type="email"], input[type="password"] {
             width: 100%;
             padding: 14px 16px;
             background-color: #282a2c;
@@ -266,8 +399,26 @@
 </head>
 <body>
 
-<div class="chat-container">
-    <h2>WebChat</h2>
+<div class="chat-container" id="main-container">
+    <div class="app-header">
+        <h2>WebChat</h2>
+        <button id="btn-toggle-settings" class="icon-btn" title="Einstellungen">⚙️</button>
+    </div>
+
+    <!-- EINSTELLUNGEN POPUP -->
+    <div id="settings-modal" class="settings-modal">
+        <div class="settings-row">
+            <span>Glow-Effekt</span>
+            <label class="switch">
+                <input type="checkbox" id="glow-toggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="settings-row">
+            <span>Glow-Farbe</span>
+            <input type="color" id="glow-color-picker" class="color-picker" value="#0b57d0">
+        </div>
+    </div>
 
     <!-- AUTHENTIFIZIERUNG -->
     <div id="auth-section">
@@ -352,7 +503,7 @@
         onMessage 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
-    const ADMIN_UID = "839EC6PcMoMLwWly7nMzGPe91wk1"; 
+    const ADMIN_UID = "HIER_DEINE_FIREBASE_UID_EINFUEGEN"; 
 
     const firebaseConfig = {
       apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
@@ -375,6 +526,49 @@
     let isAdmin = false;
     let isInitialLoad = true;
 
+    // --- GLOW EINSTELLUNGEN LOGIK ---
+    const mainContainer = document.getElementById('main-container');
+    const settingsModal = document.getElementById('settings-modal');
+    const btnToggleSettings = document.getElementById('btn-toggle-settings');
+    const glowToggle = document.getElementById('glow-toggle');
+    const glowColorPicker = document.getElementById('glow-color-picker');
+
+    const savedGlowEnabled = localStorage.getItem('glowEnabled') === 'true';
+    const savedGlowColor = localStorage.getItem('glowColor') || '#0b57d0';
+
+    glowToggle.checked = savedGlowEnabled;
+    glowColorPicker.value = savedGlowColor;
+    document.documentElement.style.setProperty('--glow-color', savedGlowColor);
+    if (savedGlowEnabled) mainContainer.classList.add('glow-active');
+
+    btnToggleSettings.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsModal.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!settingsModal.contains(e.target) && e.target !== btnToggleSettings) {
+            settingsModal.classList.remove('open');
+        }
+    });
+
+    glowToggle.addEventListener('change', (e) => {
+        const isEnabled = e.target.checked;
+        localStorage.setItem('glowEnabled', isEnabled);
+        if (isEnabled) {
+            mainContainer.classList.add('glow-active');
+        } else {
+            mainContainer.classList.remove('glow-active');
+        }
+    });
+
+    glowColorPicker.addEventListener('input', (e) => {
+        const color = e.target.value;
+        document.documentElement.style.setProperty('--glow-color', color);
+        localStorage.setItem('glowColor', color);
+    });
+
+    // --- FIREBASE LOGIK ---
     async function requestNotificationPermission(user) {
         if ('serviceWorker' in navigator && 'Notification' in window) {
             try {
