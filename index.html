@@ -11,6 +11,9 @@
     <style>
         :root {
             --glow-color: #0b57d0;
+            --gui-opacity: 0.85;
+            --gui-bg: rgba(30, 31, 32, var(--gui-opacity));
+            --gui-card-bg: rgba(40, 42, 44, var(--gui-opacity));
         }
 
         * {
@@ -28,18 +31,39 @@
             align-items: center;
             min-height: 100vh;
             padding: 20px;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            overflow-x: hidden;
         }
 
+        /* Video-Hintergrund Element */
+        #bg-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: -1;
+            display: none;
+        }
+
+        /* Glasmorphismus Container */
         .chat-container {
             position: relative;
             width: 100%;
             max-width: 550px;
-            background-color: #1e1f20;
-            border: 1px solid #333537;
+            background-color: var(--gui-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            transition: box-shadow 0.4s ease, border-color 0.4s ease;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: box-shadow 0.4s ease, border-color 0.4s ease, background-color 0.2s ease;
+            z-index: 1;
         }
 
         /* Glow-Effekt für den Rand */
@@ -71,7 +95,7 @@
         }
 
         .icon-btn:hover {
-            background-color: #282a2c;
+            background-color: rgba(255, 255, 255, 0.1);
             color: #ffffff;
         }
 
@@ -81,17 +105,32 @@
             position: absolute;
             top: 60px;
             right: 24px;
-            background-color: #282a2c;
-            border: 1px solid #444746;
+            background-color: var(--gui-card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 12px;
             padding: 16px;
-            width: 220px;
+            width: 260px;
             z-index: 100;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
         }
 
         .settings-modal.open {
             display: block;
+        }
+
+        .settings-section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #a8c7fa;
+            margin: 12px 0 6px 0;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-section-title:first-child {
+            margin-top: 0;
         }
 
         .settings-row {
@@ -104,6 +143,49 @@
 
         .settings-row:last-child {
             margin-bottom: 0;
+        }
+
+        .opacity-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .file-input-btn {
+            display: inline-block;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #a8c7fa;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            width: 100%;
+            margin-bottom: 6px;
+            transition: background-color 0.2s ease;
+        }
+
+        .file-input-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .reset-bg-btn {
+            background: transparent;
+            color: #ff6b6b;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            width: 100%;
+            text-align: right;
+            padding: 2px 0;
+        }
+
+        .reset-bg-btn:hover {
+            text-decoration: underline;
         }
 
         .color-picker {
@@ -123,7 +205,7 @@
         }
 
         .color-picker::-webkit-color-swatch {
-            border: 2px solid #444746;
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
         }
 
@@ -144,7 +226,7 @@
             position: absolute;
             cursor: pointer;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #444746;
+            background-color: rgba(255, 255, 255, 0.2);
             transition: .3s;
             border-radius: 22px;
         }
@@ -186,8 +268,8 @@
         input[type="text"], input[type="email"], input[type="password"] {
             width: 100%;
             padding: 14px 16px;
-            background-color: #282a2c;
-            border: 1px solid #444746;
+            background-color: var(--gui-card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 8px;
             color: #ffffff;
             font-size: 0.95rem;
@@ -223,11 +305,11 @@
         .secondary-btn {
             background-color: transparent;
             color: #a8c7fa;
-            border: 1px solid #444746;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .secondary-btn:hover {
-            background-color: #282a2c;
+            background-color: rgba(255, 255, 255, 0.1);
         }
 
         .delete-btn {
@@ -258,9 +340,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background-color: #282a2c;
+            background-color: var(--gui-card-bg);
             padding: 10px 14px;
             border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             margin-bottom: 16px;
             font-size: 0.9rem;
             color: #c4c7c5;
@@ -279,7 +362,7 @@
 
         .help-btn {
             background: transparent;
-            border: 1px solid #444746;
+            border: 1px solid rgba(255, 255, 255, 0.2);
             color: #8e918f;
             width: 26px;
             height: 26px;
@@ -295,7 +378,7 @@
         }
 
         .help-btn:hover {
-            background-color: #333537;
+            background-color: rgba(255, 255, 255, 0.1);
             color: #ffffff;
             border-color: #a8c7fa;
         }
@@ -313,10 +396,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background-color: #282a2c;
+            background-color: var(--gui-card-bg);
             padding: 14px;
             border-radius: 8px;
-            border: 1px solid #444746;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .lobby-info {
@@ -355,7 +438,8 @@
         }
 
         .message {
-            background-color: #282a2c;
+            background-color: var(--gui-card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             padding: 10px 14px;
             border-radius: 12px;
             max-width: 85%;
@@ -366,7 +450,7 @@
 
         .message.own {
             align-self: flex-end;
-            background-color: #004a77;
+            background-color: rgba(0, 74, 119, var(--gui-opacity));
             border-bottom-left-radius: 12px;
             border-bottom-right-radius: 2px;
         }
@@ -399,6 +483,9 @@
 </head>
 <body>
 
+<!-- Video Hintergrund (wird per JS aktiviert) -->
+<video id="bg-video" autoplay loop muted playsinline></video>
+
 <div class="chat-container" id="main-container">
     <div class="app-header">
         <h2>WebChat</h2>
@@ -407,8 +494,9 @@
 
     <!-- EINSTELLUNGEN POPUP -->
     <div id="settings-modal" class="settings-modal">
+        <div class="settings-section-title">Glow Effekt</div>
         <div class="settings-row">
-            <span>Glow-Effekt</span>
+            <span>Aktivieren</span>
             <label class="switch">
                 <input type="checkbox" id="glow-toggle">
                 <span class="slider"></span>
@@ -418,6 +506,20 @@
             <span>Glow-Farbe</span>
             <input type="color" id="glow-color-picker" class="color-picker" value="#0b57d0">
         </div>
+
+        <div class="settings-section-title">Glas & Transparenz</div>
+        <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; font-size: 0.85rem;">
+                <span>Sichtbarkeit</span>
+                <span id="opacity-value">85%</span>
+            </div>
+            <input type="range" id="opacity-slider" class="opacity-slider" min="0.1" max="1" step="0.05" value="0.85">
+        </div>
+
+        <div class="settings-section-title">Hintergrund</div>
+        <label for="bg-file-input" class="file-input-btn">🎥 Video / Bild wählen</label>
+        <input type="file" id="bg-file-input" accept="image/*,video/*" style="display: none;">
+        <button id="btn-reset-bg" class="reset-bg-btn">Hintergrund zurücksetzen</button>
     </div>
 
     <!-- AUTHENTIFIZIERUNG -->
@@ -447,7 +549,7 @@
         <h3>Verfügbare Lobbys</h3>
         <div id="lobby-list" class="lobby-list"></div>
 
-        <div id="admin-create-lobby" style="margin-top: 20px; border-top: 1px solid #444746; padding-top: 16px;">
+        <div id="admin-create-lobby" style="margin-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 16px;">
             <h3>Neue Lobby erstellen (Admin)</h3>
             <div class="input-group">
                 <input type="text" id="new-lobby-name" placeholder="Lobby Name">
@@ -503,7 +605,7 @@
         onMessage 
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
-    const ADMIN_UID = "839EC6PcMoMLwWly7nMzGPe91wk1"; 
+    const ADMIN_UID = "HIER_DEINE_FIREBASE_UID_EINFUEGEN"; 
 
     const firebaseConfig = {
       apiKey: "AIzaSyD5funl7uYInXXMBGpqmjp0O7c0tqhBNw0",
@@ -526,20 +628,38 @@
     let isAdmin = false;
     let isInitialLoad = true;
 
-    // --- GLOW EINSTELLUNGEN LOGIK ---
+    // --- EINSTELLUNGEN LOGIK (GLOW, TRANSPARENZ & HINTERGRUND) ---
     const mainContainer = document.getElementById('main-container');
     const settingsModal = document.getElementById('settings-modal');
     const btnToggleSettings = document.getElementById('btn-toggle-settings');
     const glowToggle = document.getElementById('glow-toggle');
     const glowColorPicker = document.getElementById('glow-color-picker');
+    const opacitySlider = document.getElementById('opacity-slider');
+    const opacityValue = document.getElementById('opacity-value');
+    const bgFileInput = document.getElementById('bg-file-input');
+    const bgVideo = document.getElementById('bg-video');
+    const btnResetBg = document.getElementById('btn-reset-bg');
 
+    // Glow Laden
     const savedGlowEnabled = localStorage.getItem('glowEnabled') === 'true';
     const savedGlowColor = localStorage.getItem('glowColor') || '#0b57d0';
-
     glowToggle.checked = savedGlowEnabled;
     glowColorPicker.value = savedGlowColor;
     document.documentElement.style.setProperty('--glow-color', savedGlowColor);
     if (savedGlowEnabled) mainContainer.classList.add('glow-active');
+
+    // Transparenz Laden
+    const savedOpacity = localStorage.getItem('guiOpacity') || '0.85';
+    opacitySlider.value = savedOpacity;
+    updateOpacity(savedOpacity);
+
+    // Background Laden
+    const savedBgData = localStorage.getItem('customBgData');
+    const savedBgType = localStorage.getItem('customBgType');
+
+    if (savedBgData && savedBgType) {
+        applyBackground(savedBgData, savedBgType);
+    }
 
     btnToggleSettings.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -567,6 +687,61 @@
         document.documentElement.style.setProperty('--glow-color', color);
         localStorage.setItem('glowColor', color);
     });
+
+    // Transparenz Regler Logik
+    opacitySlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        updateOpacity(val);
+        localStorage.setItem('guiOpacity', val);
+    });
+
+    function updateOpacity(val) {
+        document.documentElement.style.setProperty('--gui-opacity', val);
+        opacityValue.textContent = Math.round(val * 100) + '%';
+    }
+
+    // Hintergrund Auswählen & Speichern
+    bgFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const dataUrl = event.target.result;
+            const fileType = file.type.startsWith('video/') ? 'video' : 'image';
+
+            try {
+                localStorage.setItem('customBgData', dataUrl);
+                localStorage.setItem('customBgType', fileType);
+            } catch (err) {
+                alert("Die Datei ist etwas zu groß, um dauerhaft gespeichert zu werden. Sie wird aber für die aktuelle Sitzung verwendet!");
+            }
+
+            applyBackground(dataUrl, fileType);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    btnResetBg.addEventListener('click', () => {
+        localStorage.removeItem('customBgData');
+        localStorage.removeItem('customBgType');
+        bgVideo.style.display = 'none';
+        bgVideo.src = '';
+        document.body.style.backgroundImage = 'none';
+    });
+
+    function applyBackground(dataUrl, type) {
+        if (type === 'video') {
+            document.body.style.backgroundImage = 'none';
+            bgVideo.src = dataUrl;
+            bgVideo.style.display = 'block';
+            bgVideo.play().catch(e => console.log("Autoplay blockiert:", e));
+        } else {
+            bgVideo.style.display = 'none';
+            bgVideo.src = '';
+            document.body.style.backgroundImage = `url('${dataUrl}')`;
+        }
+    }
 
     // --- FIREBASE LOGIK ---
     async function requestNotificationPermission(user) {
